@@ -17,16 +17,21 @@ class GRUODEfunc(nn.Module):
         self.x2h = nn.Linear(input_size, 3 * hidden_size, bias = bias)
         self.h2h = nn.Linear(hidden_size, 3 * hidden_size, bias = bias)
         self.nfe = 0
+        self.hidden_size = hidden_size
 
-    def forward(self, t, hidden):
+    def forward(self, t, hidden_input):
+        hidden, input = hidden_input[:self.hidden_size], hidden_input[self.hidden_size:]
         self.nfe += 1
+        gate_x = self.x2h(input)
         gate_h = self.h2h(hidden)
-        gate_h = gate_h.squeeze()
+        gates = gate_x + gate_h
+
         h_r, h_i, h_n = gate_h.chunk(3,1)
         resetgate = F.sigmoid(h_r)
         inputgate = F.sigmoid(h_i)
         newgate = F.tanh(resetgate * h_n)
-        hy = (1 - inputgate) * (newgate - hidden)  
+        #hy = (1 - inputgate) * (newgate - hidden) 
+        hy = (1 - update_gate) * hidden + update_gate * new_gate 
         return hy  
     
 
