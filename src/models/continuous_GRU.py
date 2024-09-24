@@ -19,11 +19,10 @@ class GRUODEfunc(nn.Module):
         self.nfe = 0
         self.hidden_size = hidden_size
 
-    def forward(self, t, hidden_input):
-        hidden, input = hidden_input[:self.hidden_size], hidden_input[self.hidden_size:]
+    def forward(self, t, h, x):
         self.nfe += 1
-        gate_x = self.x2h(input)
-        gate_h = self.h2h(hidden)
+        gate_x = self.x2h(x)
+        gate_h = self.h2h(h)
         gates = gate_x + gate_h
 
         h_r, h_i, h_n = gate_h.chunk(3,1)
@@ -49,14 +48,15 @@ class GRUODECell(nn.Module):
         for w in self.parameters():
             w.data.uniform_(-std, std)
 
-    def forward(self, x, h):      
-        combined_input = torch.cat([x, h], dim = 1)
+    def forward(self, h, x):      
         #allowing the dynamics of h to jointly depend on x, h (which governed by ode)
+        # instead of combined/concatenate to state vector, x influence the dynamics as args in ODE function
+        # (reason: x doesn't change over time hence not necessary intergrate; less compute)
         self.integration_time = self.integration_time.type_as(x)
-        out = odeint(self.odefunc, combined_input, self.integration_time)
+        out = odeint(self.odefunc, h, self.integration_time, args=(x,))
         return out[1][:, self.input_size:]  
-        ## return the updated hidden state (at time 1
-        # Slice out only the hidden state part from the combined input
+        ## return the updated hidden state (at time 1)
+  
     
     @property
     def nfe(self):
@@ -79,7 +79,7 @@ class GRUODE(nn.Module):
         output = []
         for t in range(seq_len):
             x_t = input[:,t,:]
-            h = self.gruode_cell(x_t, h)
+            h = self.gruode_cell(h, x_t)
             output.append(self.fc(h))
         return torch.cat(output, dim=1)
         
