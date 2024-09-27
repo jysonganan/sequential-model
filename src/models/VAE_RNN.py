@@ -62,7 +62,24 @@ class VAE_RNN(nn.Module):
 
 
 class VAE_RNN_2(nn.Module):
+    def __init__(self, input_dim, latent_dim, hidden_dim):
+        super(VAE_RNN_2, self).__init__()
+        self.encoder = nn.Sequential(nn.Linear(input_dim, 128), nn.ReLU(),
+                                     nn.Linear(128, 2 * latent_dim))
+        self.rnn = nn.GRU(latent_dim, hidden_dim, batch_first=True)
+        self.decoder = nn.Sequential(nn.Linear(hidden_dim, 128), nn.ReLU(),
+                                     nn.Linear(128, input_dim), nn.Sigmoid())
     
+    def reparameterize(self, mean, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mean + eps * std
+    
+    def forward(self, x):
+        mean, logvar = torch.chunk(self.encoder(x), 2, dim=-1)
+        z = self.reparameterize(mean, logvar)
+        z, _ = self.rnn(z.unsqueeze(0))
+        return self.decoder(z.unsqueeze(0)), mean, logvar
 
 
 
