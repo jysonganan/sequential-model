@@ -31,11 +31,10 @@ class Decoder(nn.Module):
     
 
 class VAE_RNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim, output_dim):
-        # input_dim = output_dim: observation space
+    def __init__(self, input_dim, hidden_dim, latent_dim):
         super(VAE_RNN, self).__init__()
         self.encoder = Encoder(input_dim, hidden_dim, latent_dim)
-        self.decoder = Decoder(latent_dim, hidden_dim, output_dim)
+        self.decoder = Decoder(latent_dim, hidden_dim, input_dim)
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
 
