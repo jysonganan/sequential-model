@@ -6,9 +6,9 @@ from torch.utils.data import DataLoader, TensorDataset
 import torch.nn.functional as F
 
 
-class Encoder(nn.Module):
+class RNN_Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim):
-        super(Encoder, self).__init__()
+        super(RNN_Encoder, self).__init__()
         self.rnn = nn.GRU(input_dim, hidden_dim, batch_first=True)
         self.fc_mean = nn.Linear(hidden_dim, latent_dim)
         self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
@@ -18,9 +18,9 @@ class Encoder(nn.Module):
         mean, logvar = self.fc_mean(out), self.fc_logvar(out)
         return mean, logvar, h
     
-class Decoder(nn.Module):
+class RNN_Decoder(nn.Module):
     def __init__(self, latent_dim, hidden_dim, output_dim):
-        super(Decoder, self).__init__()
+        super(RNN_Decoder, self).__init__()
         self.rnn = nn.GRU(latent_dim, hidden_dim, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
 
@@ -28,13 +28,26 @@ class Decoder(nn.Module):
         out, h = self.rnn(z, h)
         out = self.fc(out)
         return out, h
-    
+
+class Encoder(nn.Module):
+    def __init__(self, input_dim, latent_dim):
+        super(Encoder, self).__init__()
+        self.encoder = nn.sequential(nn.Linear(input_dim, 128), nn.ReLU(),
+                                     nn.Linear(128, 2 * latent_dim))
+    def forward(self, x):
+        mean, logvar = torch.chunk(self.encoder(x), 2, dim=-1)
+        return mean, logvar
 
 class VAE_RNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim):
+    def __init__(self, input_dim, hidden_dim, latent_dim, encoder_version = "RNN"):
         super(VAE_RNN, self).__init__()
-        self.encoder = Encoder(input_dim, hidden_dim, latent_dim)
-        self.decoder = Decoder(latent_dim, hidden_dim, input_dim)
+        if encoder_version == "RNN":
+            self.encoder = RNN_Encoder(input_dim, hidden_dim, latent_dim)
+        else:
+            self.encoder = Encoder(input_dim, latent_dim)
+        
+        self.encoder_version = encoder_version
+        self.decoder = RNN_Decoder(latent_dim, hidden_dim, input_dim)
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
 
@@ -44,41 +57,27 @@ class VAE_RNN(nn.Module):
         return mean + eps * std
 
     def forward(self, x):
+
         batch_size = x.size(0)
         h = torch.zeros(1, batch_size, self.hidden_dim).to(x.device)
-        mean, logvar, h = self.encoder(x, h)
-        z = self.reparameterize(mean, logvar)
-        x_recon, h = self.decoder(z, h) 
-        return x_recon, mean, logvar
-    
+
+        if self.encoder_version == "RNN":
+            mean, logvar, h = self.encoder(x, h)
+        
         ### here, h is passed from encoder to decoder (stateful)
         ### we can also set them as stateless, h init in encoder/decoder class 
         # h = torch.zeros(1, x.size(0), hidden_dim).to(x.device)
         # and not pass h to decoder
-        
-    
 
-
-
-class VAE_RNN_2(nn.Module):
-    def __init__(self, input_dim, latent_dim, hidden_dim):
-        super(VAE_RNN_2, self).__init__()
-        self.encoder = nn.Sequential(nn.Linear(input_dim, 128), nn.ReLU(),
-                                     nn.Linear(128, 2 * latent_dim))
-        self.rnn = nn.GRU(latent_dim, hidden_dim, batch_first=True)
-        self.decoder = nn.Sequential(nn.Linear(hidden_dim, 128), nn.ReLU(),
-                                     nn.Linear(128, input_dim))
-    
-    def reparameterize(self, mean, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mean + eps * std
-    
-    def forward(self, x):
-        mean, logvar = torch.chunk(self.encoder(x), 2, dim=-1)
+        else:
+            mean, logvar = self.encoder(x)
+            
+            
         z = self.reparameterize(mean, logvar)
-        z, _ = self.rnn(z.unsqueeze(0))
-        return self.decoder(z.unsqueeze(0)), mean, logvar
+        x_recon, _ = self.decoder(z, h)
+        return x_recon, mean, logvar
+        
+
 
 
 
