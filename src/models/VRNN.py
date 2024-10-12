@@ -9,11 +9,14 @@ class VRNN(nn.Module):
        
         self.encoder_x = nn.Sequential(nn.Linear(input_dim, hidden_dim),
                                        nn.ReLU())
-        self.encoder_z = nn.Sequential(nn.Linear(latent_dim, hidden_dim),
+        self.encoder_combined = nn.Sequential(nn.Linear(2*hidden_dim, hidden_dim),
                                        nn.ReLU())
-        
+
         self.fc_mean = nn.Linear(hidden_dim, latent_dim)
         self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
+
+        self.encoder_z = nn.Sequential(nn.Linear(latent_dim, hidden_dim),
+                                       nn.ReLU())
         
         self.decoder = nn.Linear(hidden_dim, input_dim)
 
@@ -31,8 +34,10 @@ class VRNN(nn.Module):
         x_recon, mean, logvar = [], [], []
         for t in range(seq_len):
             encoded_x_t = self.encoder_x(x[:,t,:])
+            # Combine encoded_x_t and h_{t-1}
+            encoded_x_t_combined = self.encoder_combined(torch.cat([encoded_x_t, h.squueze(0)], dim=1))
            
-            mean_t, logvar_t = self.fc_mean(encoded_x_t), self.fc_logvar(encoded_x_t)
+            mean_t, logvar_t = self.fc_mean(encoded_x_t_combined), self.fc_logvar(encoded_x_t_combined)
             z_t = self.reparameterize(mean_t, logvar_t)
 
             encoded_z_t = self.encoder_z(z_t)
