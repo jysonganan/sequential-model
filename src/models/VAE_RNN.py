@@ -67,7 +67,7 @@ class VAE_RNN_2(nn.Module):
                                      nn.Linear(128, 2 * latent_dim))
         self.rnn = nn.GRU(latent_dim, hidden_dim, batch_first=True)
         self.decoder = nn.Sequential(nn.Linear(hidden_dim, 128), nn.ReLU(),
-                                     nn.Linear(128, input_dim), nn.Sigmoid())
+                                     nn.Linear(128, input_dim))
     
     def reparameterize(self, mean, logvar):
         std = torch.exp(0.5 * logvar)
